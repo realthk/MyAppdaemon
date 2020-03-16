@@ -61,7 +61,7 @@ class tts_announce(hass.Hass):
                     self.call_service("media_player/play_media", entity_id=speaker, media_content_id=filename, media_content_type="music")
 
                 if delay is not None:
-                    self.handle = self.run_in(self.run_in_say_it, delay, message=text, speaker=speaker, options=options)   
+                    self.run_in(self.run_in_say_it, delay, message=text, speaker=speaker, options=options)   
                 else:                    
                     if self.get_state(speaker)=="playing":
                         self.handle = self.listen_state(self.listen_say_it, speaker, old = "playing", message=text, speaker=speaker, options=options)   # vagy new = "stopped" ?
