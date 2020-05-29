@@ -254,15 +254,13 @@ class spotify_playlist(hass.Hass):
 
 
     def start_morning_playlist(self, event, data, args):
-        if str(datetime.now().time()) > "08:30:00":
-            avr = AVR_LIVINGROOM
-            #self.run_in(self.setAVRSpeaker, 7, speaker="A")
-            self.AVRused = True
-        else:
+        self.AVRused = True
+        if int(self.get_state("sensor.num_in_master_bed")) > 0:
             avr = AVR_BEDROOM
-            self.AVRused = True
-            #self.run_in(self.setAVRSpeaker, 7, speaker="A")
-            #self.run_in(self.setAVRSpeaker, 8, speaker="A+B")
+        else:
+            avr = AVR_LIVINGROOM
+        self.turn_off("switch.terasz_hangszoro")
+             
         self.run_in(self.setSpotifyShuffle, 10)
         self.run_in(self.setAVRParams, 6, avr=avr, volume="0.4")
         if self.start_selectedList(self.morning_list, avr, self.get_state("input_number.spotify_normal_volume")):
@@ -273,6 +271,7 @@ class spotify_playlist(hass.Hass):
         avr = AVR_BEDROOM
         #self.run_in(self.setAVRSpeaker, 7, speaker="A")
         #self.run_in(self.setAVRSpeaker, 8, speaker="A+B")
+        self.turn_off("switch.terasz_hangszoro")
         self.run_in(self.setSpotifyShuffle, 10)
         self.run_in(self.setAVRParams, 6, avr=avr, volume="0.19")
         self.start_selectedList(self.sleep_list, avr, self.get_state("input_number.spotify_night_volume"))
@@ -282,6 +281,7 @@ class spotify_playlist(hass.Hass):
         avr = AVR_BEDROOM
         #self.run_in(self.setAVRSpeaker, 7, speaker="A")
         #self.run_in(self.setAVRSpeaker, 8, speaker="A+B")
+        self.turn_off("switch.terasz_hangszoro")
         self.run_in(self.setSpotifyShuffle, 10)
         self.run_in(self.setAVRParams, 6, avr=avr, volume="0.38")
         self.start_selectedList(self.sexy_list, avr, self.get_state("input_number.spotify_night_volume"))
