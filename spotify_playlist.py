@@ -283,7 +283,7 @@ class spotify_playlist(hass.Hass):
         #self.run_in(self.setAVRSpeaker, 8, speaker="A+B")
         self.turn_off("switch.terasz_hangszoro")
         self.run_in(self.setSpotifyShuffle, 10)
-        self.run_in(self.setAVRParams, 6, avr=avr, volume="0.38")
+        self.run_in(self.setAVRParams, 6, avr=avr, volume="0.41")
         self.start_selectedList(self.sexy_list, avr, self.get_state("input_number.spotify_night_volume"))
 
     def start_chill_playlist(self, event, data, args):
