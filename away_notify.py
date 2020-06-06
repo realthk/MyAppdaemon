@@ -12,9 +12,8 @@ class away_notify(hass.Hass):
 
     def away_notify(self, event, data, args):
         if data is not None and 'message' in data:
+            message = data.get("message")
             if self.get_state(MY_PERSON)!="home":
-                message = data.get("message")
-
                 self.call_service(NOTIFY_SERVICE, message=message + " (" + datetime.datetime.now().strftime("%Y.%m.%d %H:%M:%S") + ")")
                 self.log("'" + message + "' sent.", level="INFO", log="diag_log")
             else:
