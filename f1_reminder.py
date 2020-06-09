@@ -108,17 +108,16 @@ class f1_reminder(hass.Hass):
                     raceDate = datetime.strptime(event['sessions']['race'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
                     race = Race(event['name'], translatedName, event['location'], translatedLocation, qualDate, raceDate - timedelta(minutes = MINUTES_BEFORE_RACE))
                     self.races.append(race)
-                    found = False
                     msg = race.name + " "
                     for old in oldRaces:
                         if old.name == race.name:
-                            found = True
                             if old.qualifying!=race.qualifying or old.race!=race.race:
                                 changed+=1
                                 msg += "has changed date (qual: " + race.qualifying.astimezone(self.localTZ).isoformat() + ", race: " + race.race.astimezone(self.localTZ).isoformat() + ")"
                             else:
                                 msg += "unchanged."
-                    if not found:
+                            break
+                    else:
                         new+=1
                         msg += "is new on " + race.race.astimezone(self.localTZ).isoformat()
                     self.log(msg, level="INFO")
@@ -142,14 +141,11 @@ class f1_reminder(hass.Hass):
 
     def check_next_event(self):
         if len(self.races):
-            found = False
             for event in self.races:
                 if event.race > datetime.now().astimezone(self.localTZ):
-                    found = True
                     self.announce_event(event)
                     break
-
-            if not found:
+            else:
                 self.announce(random.choice([
                     'Idén nincsen már több verseny',
                     'Erre az évre már nincsen több futam a naptárban',
