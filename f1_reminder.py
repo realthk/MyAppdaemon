@@ -1,4 +1,5 @@
-import datetime
+from datetime import datetime, timedelta
+import datetime as dt
 import calendar
 import locale
 import requests
@@ -46,7 +47,7 @@ class f1_reminder(hass.Hass):
 
         self.listen_event(self.announce_next_event, "event_f1_announcement")
 
-        onceDT = datetime.time(0, 1, 0)
+        onceDT = dt.time(0, 1, 0)
         self.run_daily(self.load_events, onceDT)                
 
     def announce(self, text):
@@ -55,7 +56,7 @@ class f1_reminder(hass.Hass):
     def add_event_listener(self, when, event_description, location):
         text = self.nice_text(event_description, location)
         handle = None
-        if when > datetime.datetime.now().astimezone(self.localTZ):
+        if when > datetime.now().astimezone(self.localTZ):
             handle = self.run_at(self.event_listener, when, message=text)
         return handle
 
@@ -86,7 +87,7 @@ class f1_reminder(hass.Hass):
 
 
     def load_events(self):
-        URL = self.baseURL + str(datetime.datetime.now().year) + ".json"
+        URL = self.baseURL + str(datetime.now().year) + ".json"
         r = requests.get(URL)
         new = changed = 0
         if len(r.content):
@@ -94,17 +95,17 @@ class f1_reminder(hass.Hass):
             if len(j['races']):
                 oldRaces = deepcopy(self.races)
                 for race in self.races:
-                    if race.qualifying > datetime.datetime.now().astimezone(self.localTZ) and race.timerQual:
+                    if race.qualifying > datetime.now().astimezone(self.localTZ) and race.timerQual:
                         self.cancel_timer(race.timerQual)
-                    if race.race > datetime.datetime.now().astimezone(self.localTZ) and race.timerRace:
+                    if race.race > datetime.now().astimezone(self.localTZ) and race.timerRace:
                         self.cancel_timer(race.timerRace)
                 self.races = []
 
                 for event in j['races']:
                     translatedName = self.translate_client.translate(event['name'], LANG)['translatedText']
                     translatedLocation = self.translate_client.translate("from the " + event['location'], LANG)['translatedText'].replace("a ", "")
-                    qualDate = datetime.datetime.strptime(event['sessions']['qualifying'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
-                    raceDate = datetime.datetime.strptime(event['sessions']['race'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
+                    qualDate = datetime.strptime(event['sessions']['qualifying'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
+                    raceDate = datetime.strptime(event['sessions']['race'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
                     race = Race(event['name'], translatedName, event['location'], translatedLocation, qualDate, raceDate - timedelta(minutes = MINUTES_BEFORE_RACE))
                     self.races.append(race)
                     found = False
@@ -143,7 +144,7 @@ class f1_reminder(hass.Hass):
         if len(self.races):
             found = False
             for event in self.races:
-                if event.race > datetime.datetime.now().astimezone(self.localTZ):
+                if event.race > datetime.now().astimezone(self.localTZ):
                     found = True
                     self.announce_event(event)
                     break
@@ -175,7 +176,7 @@ class f1_reminder(hass.Hass):
 
     def nice_date(self, date):
         text = ""
-        diff = date - datetime.datetime.now().astimezone(self.localTZ)
+        diff = date - datetime.now().astimezone(self.localTZ)
         if diff.days == 0:
             text += "ma"
         elif diff.days == 1:
@@ -183,7 +184,7 @@ class f1_reminder(hass.Hass):
         elif diff.days == 2:
             text += "holnapután"
         else:
-            weekdiff = date.isocalendar()[1] - datetime.datetime.now().astimezone(self.localTZ).isocalendar()[1]
+            weekdiff = date.isocalendar()[1] - datetime.now().astimezone(self.localTZ).isocalendar()[1]
             locale.setlocale(locale.LC_ALL, LOCALE)
             if weekdiff==1 or weekdiff==2:
                 text += "jövő "
