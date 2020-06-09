@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import datetime as dt
+import time
 import calendar
 import locale
 import requests
@@ -12,6 +13,7 @@ import pytz
 import random
 import appdaemon.plugins.hass.hassapi as hass
 
+BASE_URL = "https://github.com/sportstimes/f1/raw/master/db/"
 GOOGLE_APPLICATION_CREDENTIALS="/conf/google_ha_service_account.json"
 LANG = "hu"
 LOCALE = "hu_HU.utf8"
@@ -36,8 +38,9 @@ class f1_reminder(hass.Hass):
     def initialize(self):
         self.UTC = tz.gettz('UTC')
         self.localTZ = tz.gettz(TZ)
-        self.day_name = ['hétfőn', 'kedden', 'szerdán', 'csütörtökön', 'pénteken', 'szombaton', 'vasárnap']        
-        self.baseURL = "https://github.com/sportstimes/f1/raw/master/db/"
+        self.day_name = ['hétfőn', 'kedden', 'szerdán', 'csütörtökön', 'pénteken', 'szombaton', 'vasárnap']
+        self.qual_names = ['időmérő', 'edzés', 'kvalifikáció', 'időmérő edzés']
+        self.race_names = ['verseny', 'futam', 'grand prix', 'nagydíj', 'rendezvény']
         self.vowels = ['a', 'á', 'e', 'é', 'i', 'í', 'o', 'ö', 'ő', 'u', 'ú', 'ü', 'ű']
         self.races = []
         credentials = service_account.Credentials.from_service_account_file(GOOGLE_APPLICATION_CREDENTIALS)
@@ -85,59 +88,62 @@ class f1_reminder(hass.Hass):
             self.log(str, level="INFO")
             self.call_service("logbook/log", message=str, name="f1_reminder")                    
 
-
     def load_events(self):
-        URL = self.baseURL + str(datetime.now().year) + ".json"
-        r = requests.get(URL)
+        start_time = time.time()
+        URL = BASE_URL + str(datetime.now().year) + ".json"
+        response = requests.get(URL)
+        if not response or not len(response.content):
+            self.log(f"Cannot get F1 race calendar from '{URL}'! (ERROR: " + str(response.status_code) + ")", level="ERROR")
+            return False
+
         new = changed = 0
-        if len(r.content):
-            j = json.loads(r.content)
-            if len(j['races']):
-                oldRaces = deepcopy(self.races)
-                for race in self.races:
-                    if race.qualifying > datetime.now().astimezone(self.localTZ) and race.timerQual:
-                        self.cancel_timer(race.timerQual)
-                    if race.race > datetime.now().astimezone(self.localTZ) and race.timerRace:
-                        self.cancel_timer(race.timerRace)
-                self.races = []
+        j = json.loads(response.content)
+        if len(j['races']):
+            oldRaces = deepcopy(self.races)
+            for race in self.races:
+                if race.qualifying > datetime.now().astimezone(self.localTZ) and race.timerQual:
+                    self.cancel_timer(race.timerQual)
+                if race.race > datetime.now().astimezone(self.localTZ) and race.timerRace:
+                    self.cancel_timer(race.timerRace)
+            self.races = []
 
-                for event in j['races']:
-                    translatedName = self.translate_client.translate(event['name'], LANG)['translatedText']
-                    translatedLocation = self.translate_client.translate("from the " + event['location'], LANG)['translatedText'].replace("a ", "")
-                    qualDate = datetime.strptime(event['sessions']['qualifying'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
-                    raceDate = datetime.strptime(event['sessions']['race'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
-                    race = Race(event['name'], translatedName, event['location'], translatedLocation, qualDate, raceDate - timedelta(minutes = MINUTES_BEFORE_RACE))
-                    self.races.append(race)
-                    msg = race.name + " "
-                    for old in oldRaces:
-                        if old.name == race.name:
-                            if old.qualifying!=race.qualifying or old.race!=race.race:
-                                changed+=1
-                                msg += "has changed date (qual: " + race.qualifying.astimezone(self.localTZ).isoformat() + ", race: " + race.race.astimezone(self.localTZ).isoformat() + ")"
-                            else:
-                                msg += "unchanged."
-                            break
-                    else:
-                        new+=1
-                        msg += "is new on " + race.race.astimezone(self.localTZ).isoformat()
-                    self.log(msg, level="INFO")
-                if new>0:
-                    self.log(f"Loaded {new} race, changed {changed}.", level="INFO")
+            for event in j['races']:
+                translatedName = self.translate_client.translate(event['name'], LANG)['translatedText']
+                translatedLocation = self.translate_client.translate("from the " + event['location'], LANG)['translatedText'].replace("a ", "")
+                qualDate = datetime.strptime(event['sessions']['qualifying'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
+                raceDate = datetime.strptime(event['sessions']['race'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
+                race = Race(event['name'], translatedName, event['location'], translatedLocation, qualDate, raceDate - timedelta(minutes = MINUTES_BEFORE_RACE))
+                self.races.append(race)
+                msg = race.name + " "
+                for old in oldRaces:
+                    if old.name == race.name:
+                        if old.qualifying!=race.qualifying or old.race!=race.race:
+                            changed+=1
+                            msg += "has changed date (qualifying: " + race.qualifying.astimezone(self.localTZ).strftime("%Y.%m.%d %H:%M:%S")
+                            msg += ", race: " + raceDate.astimezone(self.localTZ).strftime("%Y.%m.%d %H:%M:%S") + ")"
+                        else:
+                            msg += "unchanged on " + raceDate.astimezone(self.localTZ).strftime("%Y.%m.%d %H:%M:%S")
+                        break
+                else:
+                    new+=1
+                    msg += "race will be on " + raceDate.astimezone(self.localTZ).strftime("%Y.%m.%d %H:%M:%S")
+                self.log(msg, level="INFO")
 
-                for race in self.races:
-                    text = race.translatedName + " forma 1 " + random.choice(\
-                        ['időmérő', 'edzés', 'kvalifikáció', 'időmérő edzés'])
-                    race.timerQual = self.add_event_listener(race.qualifying, text, race.translatedLocation)
+            runtime = round((time.time() - start_time) * 1000)
+            if new or changed:
+                self.log(f"Loaded {new} race, changed {changed} in {runtime} ms.", level="INFO")
 
-                    text = race.translatedName + " forma 1 "+random.choice(\
-                        ['verseny', 'futam', 'grand prix', 'nagydíj'])
-                    race.timerRace = self.add_event_listener(race.race, text, race.translatedLocation)
-                    if race.timerQual or race.timerRace:
-                        self.log(race.name +" timer set.", level="INFO")
-            else:
-                self.log("F1 race calendar is empty!", level="WARNING")
+            for race in self.races:
+                text = race.translatedName + " forma 1 " + random.choice(self.qual_names)
+                race.timerQual = self.add_event_listener(race.qualifying, text, race.translatedLocation)
+
+                text = race.translatedName + " forma 1 "+random.choice(self.race_names)
+                race.timerRace = self.add_event_listener(race.race, text, race.translatedLocation)
+
+            return True
         else:
-            self.log("Cannot get F1 race calendar!", level="ERROR")
+            self.log("F1 race calendar is empty!", level="WARNING")
+            return False
 
     def check_next_event(self):
         if len(self.races):
@@ -149,8 +155,7 @@ class f1_reminder(hass.Hass):
                 self.announce(random.choice([
                     'Idén nincsen már több verseny',
                     'Erre az évre már nincsen több futam a naptárban',
-                    ]))                
-                
+                    ]))
         else:
             self.announce("Üres a versenynaptár")                
     
@@ -165,7 +170,7 @@ class f1_reminder(hass.Hass):
         if (text[0] in self.vowels):
             start = "az"
         text = start + " " + text
-        text += " forma 1 "+random.choice(['verseny', 'futam', 'grand prix', 'nagydíj', 'rendezvény'])
+        text += " forma 1 "+random.choice(self.race_names)
         if (location > ""):
             text += " " + location
         return text
