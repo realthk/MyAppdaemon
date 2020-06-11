@@ -16,29 +16,39 @@ import appdaemon.plugins.hass.hassapi as hass
 BASE_URL = "https://github.com/sportstimes/f1/raw/master/db/"
 GOOGLE_APPLICATION_CREDENTIALS="/conf/google_ha_service_account.json"
 LANG = "hu"
-LOCALE = "hu_HU.utf8"
+LOCALE = "hu_HU"
 TZ = "Europe/Budapest"
 
 MINUTES_BEFORE_RACE = 5
 SOMEONE_AT_HOME = 'input_boolean.someone_at_home'
 TURN_TV_ON_SCRIPT = 'script.switch_tv_to_f1'
 
-class Race:  
-    def __init__(self, name, translatedName, location, translatedLocation, qualifying, race):  
-        self.name = name  
-        self.translatedName = translatedName  
-        self.location = location  
-        self.translatedLocation = translatedLocation  
-        self.qualifying = qualifying  
-        self.race = race  
+class Race:
+    def __init__(self, name, translatedName, location, translatedLocation, qualifying, race, countRaces, counter):
+        self.name = name
+        self.translatedName = translatedName
+        self.location = location
+        self.translatedLocation = translatedLocation
+        self.qualifying = qualifying
+        self.race = race
+        self.countRaces = countRaces
+        self.currentCount = counter
         self.timerQual = 0
         self.timerRace = 0
 
 class f1_reminder(hass.Hass):
+
+    EVENT_TYPE_QUAL = 1
+    EVENT_TYPE_RACE = 2
+
     def initialize(self):
         self.UTC = tz.gettz('UTC')
         self.localTZ = tz.gettz(TZ)
         self.day_name = ['hétfőn', 'kedden', 'szerdán', 'csütörtökön', 'pénteken', 'szombaton', 'vasárnap']
+        self.month_name = [
+            'január', 'február', 'március', 'április', 'május', 'június', 'július',
+            'augusztus', 'szeptember', 'október', 'november', 'december'
+        ]
         self.qual_names = ['időmérő', 'edzés', 'kvalifikáció', 'időmérő edzés']
         self.race_names = ['verseny', 'futam', 'grand prix', 'nagydíj', 'rendezvény']
         self.vowels = ['a', 'á', 'e', 'é', 'i', 'í', 'o', 'ö', 'ő', 'u', 'ú', 'ü', 'ű']
@@ -46,28 +56,49 @@ class f1_reminder(hass.Hass):
         credentials = service_account.Credentials.from_service_account_file(GOOGLE_APPLICATION_CREDENTIALS)
         self.translate_client = translate.Client(credentials=credentials)
 
-        self.load_events()
+        self.load_events(None)
 
-        self.listen_event(self.announce_next_event, "event_f1_announcement")
+        self.set_textvalue("input_text.next_f1_race", self.next_event_text())
+
+        self.listen_event(self.check_next_event, "event_f1_announcement")
 
         onceDT = dt.time(0, 1, 0)
-        self.run_daily(self.load_events, onceDT)                
+        self.run_daily(self.load_events, onceDT)
 
     def announce(self, text):
-        self.fire_event("tts_announce", message=text)        
+        self.fire_event("tts_announce", message=text)
 
-    def add_event_listener(self, when, event_description, location):
-        text = self.nice_text(event_description, location)
+    def add_event_listener(self, event, event_type):
         handle = None
+        if event_type==self.EVENT_TYPE_QUAL:
+            when = event.qualifying
+        else:
+            when = event.race
         if when > datetime.now().astimezone(self.localTZ):
-            handle = self.run_at(self.event_listener, when, message=text)
+            handle = self.run_at(self.event_listener, when, event=event, event_type=event_type)
         return handle
 
     def event_listener(self, kwargs):
-        if kwargs is not None and 'message' in kwargs:
-            text = kwargs.get("message")
-            str = random.choice(['Rövidesen', 'Mindjárt', 'Éppen']) + ' ' + \
-                  random.choice(['indul', 'kezdődik', 'rajtol']) + ' ' + text
+        if kwargs is not None and 'event' in kwargs and 'event_type' in kwargs:
+            event = kwargs.get("event")
+            text = event.translatedName + " forma 1 "
+            if kwargs.get("event_type")==self.EVENT_TYPE_QUAL:
+                text += random.choice(self.qual_names)
+            else:
+                text += random.choice(self.race_names)
+            text = self.nice_text(text, event.translatedLocation)
+
+            str = random.choice(['Rövidesen', 'Mindjárt', 'Éppen', 'Hamarosan', 'Nem sokára']) + ' ' + \
+                  random.choice(['indul', 'kezdődik', 'rajtol', 'elstartol'])
+
+            if event.currentCount==1:
+                str += " idén az első"
+            elif event.currentCount==event.countRaces:
+                str += " idén az utolsó"
+            elif event.currentCount==event.countRaces-1:
+                str += " idén az utolsó előtti"
+
+            str += (' ' + text)
 
             if self.get_state(SOMEONE_AT_HOME)=="on":
                 str += ', ezért ' + \
@@ -76,6 +107,7 @@ class f1_reminder(hass.Hass):
                         'hogy le ne maradj róla,',
                         'hogy kedveskedjek,',
                         'figyelmességből'
+                        'a kedvedért'
                         ]) + ' ' + \
                    'bekapcsolom a TV-t'
 
@@ -86,9 +118,9 @@ class f1_reminder(hass.Hass):
                 str += ', de senki nincs itthon, ezért nem kapcsolom be a TV-t'
 
             self.log(str, level="INFO")
-            self.call_service("logbook/log", message=str, name="f1_reminder")                    
+            self.call_service("logbook/log", message=str, name="f1_reminder")
 
-    def load_events(self):
+    def load_events(self, kwargs):
         start_time = time.time()
         URL = BASE_URL + str(datetime.now().year) + ".json"
         response = requests.get(URL)
@@ -107,12 +139,14 @@ class f1_reminder(hass.Hass):
                     self.cancel_timer(race.timerRace)
             self.races = []
 
+            counter = 0
             for event in j['races']:
-                translatedName = self.translate_client.translate(event['name'], LANG)['translatedText']
+                counter += 1
+                translatedName = self.translate_client.translate(event['name'].lower().replace("grand prix", ""), LANG)['translatedText']
                 translatedLocation = self.translate_client.translate("from the " + event['location'], LANG)['translatedText'].replace("a ", "")
                 qualDate = datetime.strptime(event['sessions']['qualifying'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
                 raceDate = datetime.strptime(event['sessions']['race'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
-                race = Race(event['name'], translatedName, event['location'], translatedLocation, qualDate, raceDate - timedelta(minutes = MINUTES_BEFORE_RACE))
+                race = Race(event['name'], translatedName, event['location'], translatedLocation, qualDate, raceDate - timedelta(minutes = MINUTES_BEFORE_RACE), len(j['races']), counter)
                 self.races.append(race)
                 msg = race.name + " "
                 for old in oldRaces:
@@ -134,11 +168,8 @@ class f1_reminder(hass.Hass):
                 self.log(f"Loaded {new} race, changed {changed} in {runtime} ms.", level="INFO")
 
             for race in self.races:
-                text = race.translatedName + " forma 1 " + random.choice(self.qual_names)
-                race.timerQual = self.add_event_listener(race.qualifying, text, race.translatedLocation)
-
-                text = race.translatedName + " forma 1 "+random.choice(self.race_names)
-                race.timerRace = self.add_event_listener(race.race, text, race.translatedLocation)
+                race.timerQual = self.add_event_listener(race, self.EVENT_TYPE_QUAL)
+                race.timerRace = self.add_event_listener(race, self.EVENT_TYPE_RACE)
 
             return True
         else:
@@ -146,31 +177,33 @@ class f1_reminder(hass.Hass):
             return False
 
     def check_next_event(self):
+        text =  self.next_event_text()
+        self.announce(text)
+
+    def next_event_text(self):
+        text = ""
         if len(self.races):
             for event in self.races:
                 if event.race > datetime.now().astimezone(self.localTZ):
-                    self.announce_event(event)
+                    text = "A következő "
+                    text += self.nice_text(event.translatedName + " " + random.choice(self.race_names), event.translatedLocation)
+                    text += ", " + self.nice_date(event.race)
                     break
             else:
-                self.announce(random.choice([
+                text = random.choice([
                     'Idén nincsen már több verseny',
                     'Erre az évre már nincsen több futam a naptárban',
-                    ]))
+                    ])
         else:
-            self.announce("Üres a versenynaptár")                
-    
-    def announce_next_event(self, event):
-        text = "A következő "
-        text += self.nice_text(event.translatedName, event.translatedLocation)
-        text += ", " + self.nice_date(event.race)
-        self.announce(text)
+            text = "Üres a versenynaptár"
+
+        return text
 
     def nice_text(self, text, location):
         start = "a"
         if (text[0] in self.vowels):
             start = "az"
         text = start + " " + text
-        text += " forma 1 "+random.choice(self.race_names)
         if (location > ""):
             text += " " + location
         return text
@@ -186,14 +219,13 @@ class f1_reminder(hass.Hass):
             text += "holnapután"
         else:
             weekdiff = date.isocalendar()[1] - datetime.now().astimezone(self.localTZ).isocalendar()[1]
-            locale.setlocale(locale.LC_ALL, LOCALE)
             if weekdiff==1 or weekdiff==2:
                 text += "jövő "
                 if weekdiff==2:
                     text += " utáni "
                 text += self.day_name[date.isocalendar()[2]-1]
             else:
-                text += calendar.month_name[date.month] + " " + str(date.day)    
+                text += self.month_name[date.month-1] + " " + str(date.day)
 
         hour = date.hour
         daypart = ""
@@ -213,4 +245,4 @@ class f1_reminder(hass.Hass):
             daypart = "éjjel"
             hour -= 12
         text += " " + daypart + " " + str(hour) + "-kor"
-        return text       
+        return text
