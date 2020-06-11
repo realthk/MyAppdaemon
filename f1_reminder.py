@@ -160,7 +160,7 @@ class f1_reminder(hass.Hass):
                         break
                 else:
                     new+=1
-                    msg += "race will be on " + raceDate.astimezone(self.localTZ).strftime("%Y.%m.%d %H:%M:%S")
+                    msg += "will be on " + raceDate.astimezone(self.localTZ).strftime("%Y.%m.%d %H:%M:%S")
                 self.log(msg, level="INFO")
 
             runtime = round((time.time() - start_time) * 1000)
