@@ -176,7 +176,7 @@ class f1_reminder(hass.Hass):
             self.log("F1 race calendar is empty!", level="WARNING")
             return False
 
-    def check_next_event(self):
+    def check_next_event(self, event, data, args):
         text =  self.next_event_text()
         self.announce(text)
 
@@ -210,12 +210,14 @@ class f1_reminder(hass.Hass):
 
     def nice_date(self, date):
         text = ""
-        diff = date - datetime.now().astimezone(self.localTZ)
-        if diff.days == 0:
+        eventdate = date.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+        nowdate = datetime.now().astimezone(self.localTZ).replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+        days  = (eventdate - nowdate).days
+        if days == 0:
             text += "ma"
-        elif diff.days == 1:
+        elif days == 1:
             text += "holnap"
-        elif diff.days == 2:
+        elif days == 2:
             text += "holnapután"
         else:
             weekdiff = date.isocalendar()[1] - datetime.now().astimezone(self.localTZ).isocalendar()[1]
