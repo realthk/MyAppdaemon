@@ -160,7 +160,11 @@ class f1_reminder(hass.Hass):
                         break
                 else:
                     new+=1
-                    msg += "will be on " + raceDate.astimezone(self.localTZ).strftime("%Y.%m.%d %H:%M:%S")
+                    if race.race > datetime.now().astimezone(self.localTZ):
+                        msg += "will be"
+                    else:
+                        msg += "was"
+                    msg += " on " + raceDate.astimezone(self.localTZ).strftime("%Y.%m.%d %H:%M:%S")
                 self.log(msg, level="INFO")
 
             runtime = round((time.time() - start_time) * 1000)
@@ -188,6 +192,9 @@ class f1_reminder(hass.Hass):
                     text = "A következő "
                     text += self.nice_text(event.translatedName + " " + random.choice(self.race_names), event.translatedLocation)
                     text += ", " + self.nice_date(event.race)
+                    if event.qualifying > datetime.now().astimezone(self.localTZ) and self.calendardays_diff(event.qualifying, datetime.now().astimezone(self.localTZ)) < 3:
+                        text += ", az edzés pedig " + self.nice_date(event.qualifying)
+                    text += " lesz."
                     break
             else:
                 text = random.choice([
@@ -208,11 +215,14 @@ class f1_reminder(hass.Hass):
             text += " " + location
         return text
 
+    def calendardays_diff(self, date1, date2):
+        A = date1.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+        B = date2.now().astimezone(self.localTZ).replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+        return (A - B).days
+
     def nice_date(self, date):
         text = ""
-        eventdate = date.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
-        nowdate = datetime.now().astimezone(self.localTZ).replace(hour = 0, minute = 0, second = 0, microsecond = 0)
-        days  = (eventdate - nowdate).days
+        days  = self.calendardays_diff(date, datetime.now().astimezone(self.localTZ))
         if days == 0:
             text += "ma"
         elif days == 1:
