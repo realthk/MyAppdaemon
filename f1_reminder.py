@@ -13,7 +13,8 @@ import pytz
 import random
 import appdaemon.plugins.hass.hassapi as hass
 
-BASE_URL = "https://github.com/sportstimes/f1/raw/master/db/"
+#BASE_URL = "https://github.com/sportstimes/f1/raw/master/db/"
+BASE_URL = "https://f1calendar.com/api/year/"
 GOOGLE_APPLICATION_CREDENTIALS="/conf/google_ha_service_account.json"
 LANG = "hu"
 LOCALE = "hu_HU"
@@ -122,7 +123,8 @@ class f1_reminder(hass.Hass):
 
     def load_events(self, kwargs):
         start_time = time.time()
-        URL = BASE_URL + str(datetime.now().year) + ".json"
+#        URL = BASE_URL + str(datetime.now().year) + ".json"
+        URL = BASE_URL + str(datetime.now().year)
         response = requests.get(URL)
         if not response or not len(response.content):
             self.log(f"Cannot get F1 race calendar from '{URL}'! (ERROR: " + str(response.status_code) + ")", level="ERROR")
@@ -141,6 +143,15 @@ class f1_reminder(hass.Hass):
 
             counter = 0
             for event in j['races']:
+                if len(event['sessions']['qualifying'])!=len("2020-10-31T13:00:00Z"):
+                    msg = event['name'] + " has invalid qualifying date '"+event['sessions']['qualifying']+"'"
+                    self.log(msg, level="WARNING")
+                    continue
+                if len(event['sessions']['race'])!=len("2020-10-31T13:00:00Z"):
+                    msg = event['name'] + " has invalid race date '"+event['sessions']['race']+"'"
+                    self.log(msg, level="WARNING")
+                    continue
+
                 counter += 1
                 translatedName = self.translate_client.translate(event['name'].lower().replace("grand prix", ""), LANG)['translatedText']
                 translatedLocation = self.translate_client.translate("from the " + event['location'], LANG)['translatedText'].replace("a ", "")
