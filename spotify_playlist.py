@@ -5,6 +5,8 @@ import time
 from datetime import datetime
 
 SPOTIFY = 'media_player.spotify_realthk'
+SOURCE_BRIX = "Brix"
+SOURCE_BEDROOM = "Bedroom Speaker"
 AVR_LIVINGROOM  = 'media_player.pioneer_avr'
 AVR_BEDROOM     = 'media_player.pioneer_avr_zone2'
 BEDROOM_SPEAKER = 'media_player.bedroom'
@@ -13,16 +15,12 @@ SOMEONE_WOKE_UP_FLAG = 'input_boolean.someone_woke_up_after_alarm'
 SPOTIFY_SWITCHED_FLAG = 'input_boolean.spotify_music_switched_to_living_room'
 RETRIES = 5
 SONGRETRIES = 3
-#SPEAKER = 'media_player.arpi'
 SPEAKER = 'media_player.living_room_display'
-#TTS_SERVICE = 'tts/google_say'
-#TTS_LANGUAGE = 'hu'
-#TTS_SERVICE = 'tts/mygooglecloudtts_say'
 TTS_SERVICE = 'tts/google_cloud_say'
 TTS_LANGUAGE = 'hu-HU'
 
 class spotify_playlist(hass.Hass):
-    AVRused = True 
+    AVRused = True
 
     def initialize(self):
         self.vowels = ['a', 'á', 'e', 'é', 'i', 'í', 'o', 'ö', 'ő', 'u', 'ú', 'ü', 'ű']
@@ -247,10 +245,10 @@ class spotify_playlist(hass.Hass):
 
         }
 
-        self.listen_event(self.start_morning_playlist,  "event_start_morning_playlist")        
-        self.listen_event(self.start_sleep_playlist,    "event_start_sleep_playlist")        
-        self.listen_event(self.start_sexy_playlist,     "event_start_sexy_playlist")        
-        self.listen_event(self.start_chill_playlist,    "event_start_chill_playlist")        
+        self.listen_event(self.start_morning_playlist,  "event_start_morning_playlist")
+        self.listen_event(self.start_sleep_playlist,    "event_start_sleep_playlist")
+        self.listen_event(self.start_sexy_playlist,     "event_start_sexy_playlist")
+        self.listen_event(self.start_chill_playlist,    "event_start_chill_playlist")
 
 
     def start_morning_playlist(self, event, data, args):
@@ -260,7 +258,7 @@ class spotify_playlist(hass.Hass):
         else:
             avr = AVR_LIVINGROOM
         self.turn_off("switch.terasz_hangszoro")
-             
+
         self.run_in(self.setSpotifyShuffle, 10)
         self.run_in(self.setAVRParams, 6, avr=avr, volume="0.4")
         if self.start_selectedList(self.morning_list, avr, self.get_state("input_number.spotify_normal_volume")):
@@ -269,8 +267,6 @@ class spotify_playlist(hass.Hass):
     def start_sleep_playlist(self, event, data, args):
         self.AVRused = True
         avr = AVR_BEDROOM
-        #self.run_in(self.setAVRSpeaker, 7, speaker="A")
-        #self.run_in(self.setAVRSpeaker, 8, speaker="A+B")
         self.turn_off("switch.terasz_hangszoro")
         self.run_in(self.setSpotifyShuffle, 10)
         self.run_in(self.setAVRParams, 6, avr=avr, volume="0.19")
@@ -279,8 +275,6 @@ class spotify_playlist(hass.Hass):
     def start_sexy_playlist(self, event, data, args):
         self.AVRused = True
         avr = AVR_BEDROOM
-        #self.run_in(self.setAVRSpeaker, 7, speaker="A")
-        #self.run_in(self.setAVRSpeaker, 8, speaker="A+B")
         self.turn_off("switch.terasz_hangszoro")
         self.run_in(self.setSpotifyShuffle, 10)
         self.run_in(self.setAVRParams, 6, avr=avr, volume="0.41")
@@ -291,54 +285,68 @@ class spotify_playlist(hass.Hass):
         self.test_running_playlist()
         avr = AVR_LIVINGROOM
         self.run_in(self.setAVRParams, 6, avr=avr, volume="0.42")
-        #self.run_in(self.setAVRSpeaker, 7, speaker="A")
         self.run_in(self.setSpotifyShuffle, 10)
         self.start_selectedList(self.evening_chill_list, avr, self.get_state("input_number.spotify_normal_volume"))
 
 
-    def start_selectedList(self, selectedList, avr, volume_level):    
+    def start_selectedList(self, selectedList, avr, volume_level):
         self.turn_off(ALARM_FIRED_FLAG)
         self.turn_off(SPOTIFY_SWITCHED_FLAG)
         if self.AVRused:
             self.turn_on(avr)
         success = False
-        songTries = 0   
-        errorCode = 0   
+        songTries = 0
+        errorCode = 0
         while not success and songTries < SONGRETRIES:
             songTries += 1
             tries = 0
             listName, listUrl = random.choice(list(selectedList.items()))
             if (self.AVRused):
-                spotify_source = self.get_state("input_text.media_player_spotify")
-            else:    
-                spotify_source = BEDROOM_SPEAKER
+                spotify_source = SOURCE_BRIX
+            else:
+                spotify_source = SOURCE_BEDROOM
 
-            spotify_source = "Brix"
             while not success and tries < RETRIES:
                 tries += 1
                 try:
                     self.call_service("media_player/select_source", entity_id=SPOTIFY, source=spotify_source)
                 except:
-                    str = f"Exception during Spotify select source to {spotify_source}"
+                    str = f"Exception during Spotify select source to '{spotify_source}'"
                     self.log(str)
                     self.call_service("logbook/log", message=str, name="spotify_playlist")
                     errorCode = 1
                     time.sleep(.3)
                     continue
 
-                time.sleep(0.2)
+                time.sleep(0.8)
+                current_spotify_source = self.get_state(SPOTIFY, attribute="source")
+                if current_spotify_source != spotify_source:
+                    str = f"Spotify current source is '{current_spotify_source}' instead of '{spotify_source}'!"
+                    self.log(str)
+                    self.call_service("logbook/log", message=str, name="spotify_playlist")
+                    time.sleep(.3)
+                    continue
+                else:
+                    str = f"OK, Spotify current source is '{current_spotify_source}'"
+                    self.log(str)
+                    self.call_service("logbook/log", message=str, name="spotify_playlist")
 
                 try:
                     self.call_service("media_player/shuffle_set", entity_id=SPOTIFY, shuffle="true")
                 except:
-                    str = f"Cannot set media player to shuffle"
+                    str = f"Cannot set media player to shuffle exception"
                     self.log(str)
                     self.call_service("logbook/log", message=str, name="shuffle_set")
                     errorCode = 2
                     time.sleep(.3)
                     continue
 
-                time.sleep(1)
+                time.sleep(0.5)
+                #if self.get_state(SPOTIFY, attribute="shuffle")!=True:
+                #    str = f"Spotify set to shuffle did not work!"
+                #    self.log(str)
+                 #   self.call_service("logbook/log", message=str, name="spotify_playlist")
+
 
                 try:
                     self.call_service("media_player/play_media", entity_id=SPOTIFY, media_content_id=listUrl, media_content_type="playlist")
@@ -350,7 +358,6 @@ class spotify_playlist(hass.Hass):
                     time.sleep(.3)
                     continue
 
-
                 time.sleep(.3)
 
                 str = f"Started Spotify playlist '{listName}' url: {listUrl}"
@@ -358,7 +365,7 @@ class spotify_playlist(hass.Hass):
                 self.call_service("logbook/log", message=str, name="spotify_playlist")
 
                 try:
-                    self.call_service("media_player/volume_set", entity_id=SPOTIFY, volume_level=volume_level)                    
+                    self.call_service("media_player/volume_set", entity_id=SPOTIFY, volume_level=volume_level)
                 except:
                     str = f"Exception during Spotify volume set"
                     self.log(str)
@@ -369,7 +376,7 @@ class spotify_playlist(hass.Hass):
 
                 success = True
 
-            if not success:        
+            if not success:
                 str = f"Cannot start Spotify playlist '{listName}' url: {listUrl} in {RETRIES} tries"
                 self.log(str)
                 self.call_service("logbook/log", message=str, name="spotify_playlist")
@@ -389,7 +396,7 @@ class spotify_playlist(hass.Hass):
             self.fire_event("tts_announce", message=str)
             return False
 
-    def setSpotifyShuffle(self, kwargs):      
+    def setSpotifyShuffle(self, kwargs):
         try:
             self.call_service("media_player/shuffle_set", entity_id=SPOTIFY, shuffle="True")
         except:
@@ -397,7 +404,7 @@ class spotify_playlist(hass.Hass):
             self.log(str)
             self.call_service("logbook/log", message=str, name="spotify_playlist")
 
-    def setAVRParams(self, kwargs):      
+    def setAVRParams(self, kwargs):
         if kwargs is not None and 'volume' in kwargs:
             self.call_service("media_player/volume_set", entity_id=kwargs.get("avr"), volume_level=kwargs.get("volume"))
             time.sleep(.4)
@@ -434,7 +441,7 @@ class spotify_playlist(hass.Hass):
         if (text[0] in self.vowels):
             start = "az"
         text = start + " " + text
-        return text                
+        return text
 
 
 
