@@ -3,15 +3,22 @@ import random
 import appdaemon.plugins.hass.hassapi as hass
 import time
 import queue
+import requests 
+import math
+from io import BytesIO
 from datetime import datetime
+from mutagen.mp3 import MP3
 
 #SPEAKER = 'media_player.arpi'
 #SPEAKER = 'media_player.living_room_display'
 SPEAKER = 'media_player.mpd'
+#SPEAKER = 'media_player.local_mpd'
 #TTS_SERVICE = 'tts/google_say'
+EXTRA_DELAY_IF_SLEEPS = False       # Set this to True for Google Home speaker
 SOMEONE_AT_HOME = 'input_boolean.someone_at_home'
 TTS_SERVICE = 'tts/google_cloud_say'
 TTS_LANGUAGE = 'hu-HU'
+FILE_URL = 'https://realthk.duckdns.org:8123/local/media/'
 
 class tts_announce(hass.Hass):
 
@@ -66,8 +73,14 @@ class tts_announce(hass.Hass):
                     self.q_listen.put(handle)
                 else:
                     if filename is not None:
-                        self.call_service("media_player/play_media", entity_id=speaker, media_content_id=filename, media_content_type="music")
-                        if delay is not None:
+                        self.call_service("media_player/play_media", entity_id=speaker, media_content_id=FILE_URL + filename, media_content_type="music")
+                        if text>'':
+                            r = requests.get(FILE_URL + filename)
+                            audio = MP3(BytesIO(r.content))
+                            delay = math.ceil(audio.info.length)
+                            # Google cast speakers might need extra 1-2 secs to wake up
+                            if EXTRA_DELAY_IF_SLEEPS and self.get_state(speaker)=="off": 
+                                delay += 2
                             timer = self.run_in(self.run_in_say_it, delay, message=text, speaker=speaker, options=options)
                             self.q_run.put(timer)   # handle must be put in a queue, as this app might be called again while a timer already runs
                     else:
