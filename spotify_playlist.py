@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 
 SPOTIFY = 'media_player.spotify_realthk'
-SOURCE_BRIX = "Brix"
+SOURCE_BRIX = "HomeAssistant"
 SOURCE_BEDROOM = "Bedroom Speaker"
 AVR_LIVINGROOM  = 'media_player.pioneer_avr'
 AVR_BEDROOM     = 'media_player.pioneer_avr_zone2'
@@ -290,6 +290,7 @@ class spotify_playlist(hass.Hass):
 
 
     def start_selectedList(self, selectedList, avr, volume_level):
+        self.call_service("rest_command/restart_spotify_connect")
         self.turn_off(ALARM_FIRED_FLAG)
         self.turn_off(SPOTIFY_SWITCHED_FLAG)
         if self.AVRused:
