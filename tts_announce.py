@@ -9,10 +9,12 @@ import mutagen
 from io import BytesIO
 from datetime import datetime
 
-#SPEAKER = 'media_player.arpi'
+# Have this in appdeamon config, as mutagen is not part of it:
+# python_packages:
+#  - mutagen
+
 #SPEAKER = 'media_player.living_room_display'
 SPEAKER = 'media_player.mpd'
-#SPEAKER = 'media_player.local_mpd'
 #TTS_SERVICE = 'tts/google_say'
 EXTRA_DELAY_IF_SLEEPS = False       # Set this to True for Google Home speaker
 SOMEONE_AT_HOME = 'input_boolean.someone_at_home'
