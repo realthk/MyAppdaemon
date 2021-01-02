@@ -4,6 +4,22 @@ import appdaemon.plugins.hass.hassapi as hass
 import time
 from datetime import datetime
 
+# For "rest_command/restart_spotify_connect" to work, has to create this command in configuration.yaml
+# (HA client usually disappears from Spotify Connect list after some time, and gets back after restart)
+"""
+rest_command:
+  restart_spotify_connect:
+    url: http://supervisor/addons/a0d7b954_spotify/restart
+    method: POST
+    headers:
+      authorization: !secret api_bearer_token
+      Content-Type: "application/json"
+"""
+# And in secrets.yaml
+# api_bearer_token: "Bearer xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# where token is provided by Remote API proxy installed from  https://developers.home-assistant.io/
+
+
 SPOTIFY = 'media_player.spotify_realthk'
 SOURCE_BRIX = "HomeAssistant"
 SOURCE_BEDROOM = "Bedroom Speaker"
