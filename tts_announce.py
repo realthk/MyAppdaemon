@@ -75,15 +75,16 @@ class tts_announce(hass.Hass):
                     if filename is not None:
                         self.call_service("media_player/play_media", entity_id=speaker, media_content_id=FILE_URL + filename, media_content_type="music")
                         if text>'':
-                            r = requests.get(FILE_URL + filename)
-                            ext = filename[-3:].upper()
-                            if ext=="MP3":
-                                audio = mutagen.mp3.MP3(BytesIO(r.content))    
-                            elif ext=="OGG":
-                                audio = mutagen.oggvorbis.OggVorbis(BytesIO(r.content))
-                            else:
-                                audio = mutagen.File(BytesIO(r.content))
-                            delay = math.ceil(audio.info.length)
+                            if delay is None:
+                                r = requests.get(FILE_URL + filename)
+                                ext = filename[-3:].upper()
+                                if ext=="MP3":
+                                    audio = mutagen.mp3.MP3(BytesIO(r.content))    
+                                elif ext=="OGG":
+                                    audio = mutagen.oggvorbis.OggVorbis(BytesIO(r.content))
+                                else:
+                                    audio = mutagen.File(BytesIO(r.content))
+                                delay = math.ceil(audio.info.length)
                             # Google cast speakers might need extra 1-2 secs to wake up
                             if EXTRA_DELAY_IF_SLEEPS and self.get_state(speaker)=="off": 
                                 delay += 2
