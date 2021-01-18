@@ -70,6 +70,23 @@ class tts_announce(hass.Hass):
             self.handle = None
             if self.get_state(SOMEONE_AT_HOME)=="on":
                 self.call_service("media_player/volume_set", entity_id=speaker, volume_level=volume)
+                if text>'':
+                    if delay is None and filename is not None and filename>'':
+                        r = requests.get(FILE_URL + filename)
+                        ext = filename[-3:].upper()
+                        if ext=="MP3":
+                            audio = mutagen.mp3.MP3(BytesIO(r.content))    
+                        elif ext=="OGG":
+                            audio = mutagen.oggvorbis.OggVorbis(BytesIO(r.content))
+                        else:
+                            audio = mutagen.File(BytesIO(r.content))
+                        delay = math.ceil(audio.info.length)
+                    elif delay is None:
+                        delay = 0    
+                    # Google cast speakers might need extra 1-2 secs to wake up
+                    if EXTRA_DELAY_IF_SLEEPS and self.get_state(speaker)=="off": 
+                        delay += 3
+
                 if self.get_state(speaker)=="playing":
                     handle = self.listen_state(self.listen_say_it, speaker, old = "playing", message=text, speaker=speaker, options=options, filename=filename, delay=delay)   # vagy new = "stopped" ?
                     self.q_listen.put(handle)
@@ -77,19 +94,6 @@ class tts_announce(hass.Hass):
                     if filename is not None:
                         self.call_service("media_player/play_media", entity_id=speaker, media_content_id=FILE_URL + filename, media_content_type="music")
                         if text>'':
-                            if delay is None:
-                                r = requests.get(FILE_URL + filename)
-                                ext = filename[-3:].upper()
-                                if ext=="MP3":
-                                    audio = mutagen.mp3.MP3(BytesIO(r.content))    
-                                elif ext=="OGG":
-                                    audio = mutagen.oggvorbis.OggVorbis(BytesIO(r.content))
-                                else:
-                                    audio = mutagen.File(BytesIO(r.content))
-                                delay = math.ceil(audio.info.length)
-                            # Google cast speakers might need extra 1-2 secs to wake up
-                            if EXTRA_DELAY_IF_SLEEPS and self.get_state(speaker)=="off": 
-                                delay += 2
                             timer = self.run_in(self.run_in_say_it, delay, message=text, speaker=speaker, options=options)
                             self.q_run.put(timer)   # handle must be put in a queue, as this app might be called again while a timer already runs
                     else:

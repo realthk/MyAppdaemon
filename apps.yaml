@@ -4,17 +4,16 @@ f1_reminder:
 
 holiday_switcher:
   module: holiday_switcher
-  class: holiday_switcher  
+  class: holiday_switcher
 
 spotify_playlist:
   module: spotify_playlist
-  class: spotify_playlist    
+  class: spotify_playlist
 
 tts_announce:
   module: tts_announce
   class: tts_announce
-        
+
 away_notify:
   module: away_notify
   class: away_notify
-          

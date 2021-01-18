@@ -4,8 +4,8 @@ import time
 import calendar
 import locale
 import requests
-from google.cloud import translate_v2 as translate
-from google.oauth2 import service_account
+#from google.cloud import translate_v2 as translate
+#from google.oauth2 import service_account
 from copy import deepcopy
 from dateutil import tz
 import json
@@ -54,8 +54,8 @@ class f1_reminder(hass.Hass):
         self.race_names = ['verseny', 'futam', 'grand prix', 'nagydíj', 'rendezvény']
         self.vowels = ['a', 'á', 'e', 'é', 'i', 'í', 'o', 'ö', 'ő', 'u', 'ú', 'ü', 'ű']
         self.races = []
-        credentials = service_account.Credentials.from_service_account_file(GOOGLE_APPLICATION_CREDENTIALS)
-        self.translate_client = translate.Client(credentials=credentials)
+#        credentials = service_account.Credentials.from_service_account_file(GOOGLE_APPLICATION_CREDENTIALS)
+#        self.translate_client = translate.Client(credentials=credentials)
 
         self.load_events(None)
 
@@ -153,8 +153,10 @@ class f1_reminder(hass.Hass):
                     continue
 
                 counter += 1
-                translatedName = self.translate_client.translate(event['name'].lower().replace("grand prix", ""), LANG)['translatedText']
-                translatedLocation = self.translate_client.translate("from the " + event['location'], LANG)['translatedText'].replace("a ", "")
+#                translatedName = self.translate_client.translate(event['name'].lower().replace("grand prix", ""), LANG)['translatedText']
+                translatedName = event['name'].lower().replace("grand prix", "")
+#                translatedLocation = self.translate_client.translate("from the " + event['location'], LANG)['translatedText'].replace("a ", "")
+                translatedLocation = event['location']
                 qualDate = datetime.strptime(event['sessions']['qualifying'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
                 raceDate = datetime.strptime(event['sessions']['race'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=self.UTC).astimezone(self.localTZ)
                 race = Race(event['name'], translatedName, event['location'], translatedLocation, qualDate, raceDate - timedelta(minutes = MINUTES_BEFORE_RACE), len(j['races']), counter)

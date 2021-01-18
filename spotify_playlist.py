@@ -276,7 +276,7 @@ class spotify_playlist(hass.Hass):
         self.turn_off("switch.terasz_hangszoro")
 
         self.run_in(self.setSpotifyShuffle, 10)
-        self.run_in(self.setAVRParams, 6, avr=avr, volume="0.4")
+        self.run_in(self.setAVRParams, 6, avr=avr, volume="0.34")
         if self.start_selectedList(self.morning_list, avr, self.get_state("input_number.spotify_normal_volume")):
             self.turn_on(ALARM_FIRED_FLAG)
 
@@ -285,7 +285,7 @@ class spotify_playlist(hass.Hass):
         avr = AVR_BEDROOM
         self.turn_off("switch.terasz_hangszoro")
         self.run_in(self.setSpotifyShuffle, 10)
-        self.run_in(self.setAVRParams, 6, avr=avr, volume="0.19")
+        self.run_in(self.setAVRParams, 6, avr=avr, volume="0.16")
         self.start_selectedList(self.sleep_list, avr, self.get_state("input_number.spotify_night_volume"))
 
     def start_sexy_playlist(self, event, data, args):
@@ -293,14 +293,14 @@ class spotify_playlist(hass.Hass):
         avr = AVR_BEDROOM
         self.turn_off("switch.terasz_hangszoro")
         self.run_in(self.setSpotifyShuffle, 10)
-        self.run_in(self.setAVRParams, 6, avr=avr, volume="0.41")
-        self.start_selectedList(self.sexy_list, avr, self.get_state("input_number.spotify_night_volume"))
+        self.run_in(self.setAVRParams, 6, avr=avr, volume="0.32")
+        self.start_selectedList(self.sexy_list, avr, self.get_state("input_number.spotify_normal_volume"))
 
     def start_chill_playlist(self, event, data, args):
         self.AVRused = True
         self.test_running_playlist()
         avr = AVR_LIVINGROOM
-        self.run_in(self.setAVRParams, 6, avr=avr, volume="0.42")
+        self.run_in(self.setAVRParams, 6, avr=avr, volume="0.35")
         self.run_in(self.setSpotifyShuffle, 10)
         self.start_selectedList(self.evening_chill_list, avr, self.get_state("input_number.spotify_normal_volume"))
 
